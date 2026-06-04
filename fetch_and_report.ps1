@@ -5,7 +5,7 @@
 
 param(
     [string]$Date = (Get-Date -Format 'yyyy-MM-dd'),
-    [int]$MaxPages = 5,
+    [int]$MaxPages = 100,
     [string]$OutputDir = "$PSScriptRoot\output"
 )
 
@@ -26,7 +26,7 @@ function Get-Announcements {
     $pageNum = 1
     $seDate = "$Date~$Date"
     while ($pageNum -le $MaxPages) {
-        $body = @{stock=''; pageNum=$pageNum; pageSize=50; tabName='fulltext'; plate=$Plate; seDate=$seDate; sortName='announcementTime'; sortType='desc'}
+        $body = @{stock=''; pageNum=$pageNum; pageSize=30; tabName='fulltext'; plate=$Plate; seDate=$seDate; sortName='announcementTime'; sortType='desc'}
         try {
             $r = Invoke-RestMethod -Uri 'http://www.cninfo.com.cn/new/hisAnnouncement/query' -Method POST -Body $body -ContentType 'application/x-www-form-urlencoded' -TimeoutSec 15
             if ($r.announcements -and $r.announcements.Count -gt 0) {
