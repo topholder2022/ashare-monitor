@@ -222,12 +222,13 @@ function Get-TrendPosition {
     $opens = foreach ($e in $Kline) { [double]$e[1] }
     $closes= foreach ($e in $Kline) { [double]$e[2] }
     $n = $Kline.Count
-    # 突发量变 (criterion 3): last 3 days vol == last 230 days vol AND 阳线
+    # 突发量变 (criterion 3): last 10 days vol == last 230 days vol AND 阳线
     $i3 = [Math]::Max(0, $n-3)
+    $i10 = [Math]::Max(0, $n-10)
     $i230 = [Math]::Max(0, $n-230)
-    $d3Vol   = ($vols[$i3..($n-1)] | Measure-Object -Maximum).Maximum
+    $d10Vol  = ($vols[$i10..($n-1)] | Measure-Object -Maximum).Maximum
     $d230Vol = ($vols[$i230..($n-1)] | Measure-Object -Maximum).Maximum
-    if ($d3Vol -eq $d230Vol -and $closes[-1] -gt $opens[-1]) { $labels += "突发量变" }
+    if ($d10Vol -eq $d230Vol -and $closes[-1] -gt $opens[-1]) { $labels += "突发量变" }
     # Last 15 / 75 days for precondition and trend evaluation
     $i15 = [Math]::Max(0, $n-15)
     $i75 = [Math]::Max(0, $n-75)
