@@ -290,7 +290,10 @@ foreach ($ann in $allAnn) {
     $null = $processed.Add([PSCustomObject]@{Score=$totalScore; Code=$code; Name=$name; Title=$title; Category=$catLabel; Time=$dtStr; Board=$board; Mcap=$mcap; ChangePct=$cp; PrevChangePct=$prevCp; Summary=$summary; Sentiment=$sentimentLabel; CorrScore=$corrScore; CorrLabel=$corrLabel; TrendLabels=$trendLbls; Url="http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"})
 }
 $sorted = $processed | Sort-Object Score -Descending
-Write-Output "Processed: $($sorted.Count) announcements"
+$totalBefore = $sorted.Count
+# Filter: only show stocks that meet at least one trend position criterion
+$sorted = $sorted | Where-Object { $_.TrendLabels -and $_.TrendLabels.Count -gt 0 }
+Write-Output "Processed: $($sorted.Count) announcements (filtered from $totalBefore)"
 
 # ============ 5. Generate HTML ============
 Write-Output "Generating HTML..."
@@ -415,7 +418,7 @@ tr.normal .score{color:#999}
 </style>
 </head>
 <body>
-<div class="header"><h1>A股公告热门排行</h1><div class="subtitle">$Date | A股上市公司最新公告 按热度排序</div><div class="stats">共 $total1 条公告 更新时间 $gt | 涨跌幅数据为上一个交易日</div></div>
+<div class="header"><h1>A股公告热门排行（趋势精选）</h1><div class="subtitle">$Date | 仅显示符合趋势位置评估标准的股票公告</div><div class="stats">共 $total1 条公告 更新时间 $gt | 涨跌幅数据为上一个交易日</div></div>
 <div class="container">
 <div class="controls">
 <label>搜索:</label><input type="text" class="search-box" id="searchBox" placeholder="股票代码/名称/标题..." oninput="filterTable()">
