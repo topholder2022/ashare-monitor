@@ -354,8 +354,13 @@ foreach ($item in $sorted) {
         }
     }
     if (-not $trendHtml) { $trendHtml = "<span class='trend-na'>-</span>" }
+    # K-line close prices for mini chart (last 20 days)
+    $closes20 = if ($klineMap.ContainsKey($item.Code) -and $klineMap[$item.Code].Count -ge 20) { ($klineMap[$item.Code][-20..-1] | ForEach-Object { [Math]::Round([double]$_[2], 2) }) -join ',' } else { '' }
+    # EastMoney URL for stock code link
+    $emPrefix = if ($item.Code -match '^(60|688)') {'sh'} else {'sz'}
+    $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html"
     $itemsHtml += @"
-    <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore"><td class="rank">$i</td><td class="code">$($item.Code)</td><td class="name">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="time">$($item.Time)</td></tr>
+    <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore" data-closes="$closes20"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank" title="点击查看K线图">$($item.Code)</a></td><td class="name" data-code="$($item.Code)">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="time">$($item.Time)</td></tr>
 "@
     $i++
 }
@@ -400,7 +405,14 @@ tr:hover{background:#f7f9fc}
 tr.high .rank{color:#e74c3c}
 tr.medium .rank{color:#e67e22}
 .code{font-family:'SF Mono','Consolas',monospace;color:#555;font-weight:500}
-.name{font-weight:600}
+.code a{color:#555;text-decoration:none;cursor:pointer}
+.code a:hover{color:#0f3460;text-decoration:underline}
+.name{font-weight:600;cursor:pointer;position:relative}
+.name:hover{color:#0f3460}
+.kline-tip{position:fixed;z-index:9999;background:#fff;border:1px solid #d9d9d9;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:10px 14px 8px;pointer-events:none;display:none;min-width:220px}
+.kline-tip .tip-title{font-size:11px;color:#999;margin-bottom:4px;text-align:center}
+.kline-tip svg{display:block}
+.kline-tip .tip-stats{display:flex;justify-content:space-between;font-size:10px;color:#999;margin-top:4px}
 .board{font-size:12px;color:#999}
 .title-col{max-width:420px}
 .title-col a{color:#333;text-decoration:none;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
@@ -452,12 +464,32 @@ tr.normal .score{color:#999}
 <div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">昨日涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
 </table></div>
-<div class="footer">数据来源：巨潮资讯网(CNINFO) 每个工作日9:00更新</div>
+<div class="footer">数据来源：巨潮资讯网(CNINFO) 每个工作日9:00更新 | 悬停名称看K线简图，点击代码看详细K线</div>
 </div>
+<div id="klineTip" class="kline-tip"><div class="tip-title">最近20日收盘价走势</div><svg id="klineSvg" width="200" height="60"></svg><div class="tip-stats"><span id="tipHigh">-</span><span id="tipLow">-</span></div></div>
 <script>
 function filterTable(){var q=document.getElementById('searchBox').value.toLowerCase(),cf=document.getElementById('catFilter').value,bf=document.getElementById('boardFilter').value,rows=document.querySelectorAll('#tableBody tr');rows.forEach(function(r){var c=r.cells[1]?.textContent.toLowerCase()||'',n=r.cells[2]?.textContent.toLowerCase()||'',t=r.cells[4]?.textContent.toLowerCase()||'',ct=r.cells[5]?.textContent.trim()||'',b=r.cells[3]?.textContent||'';r.style.display=(!q||c.includes(q)||n.includes(q)||t.includes(q))&&(!cf||ct===cf)&&(!bf||b===bf)?'':'none'})}
 var sortState={col:'score',dir:'desc'};
 function sortTable(col){var ths=document.querySelectorAll('th.sortable');ths.forEach(function(t){t.classList.remove('asc','desc')});var th=document.querySelector('th[data-col="'+col+'"]');if(sortState.col===col){sortState.dir=sortState.dir==='asc'?'desc':'asc'}else{sortState.col=col;sortState.dir='desc'}th.classList.add(sortState.dir);var tbody=document.getElementById('tableBody'),rows=Array.from(tbody.querySelectorAll('tr'));rows.sort(function(a,b){var va,vb;if(col==='score'||col==='rank'){va=parseInt(a.cells[0]?.textContent)||0;vb=parseInt(b.cells[0]?.textContent)||0;if(col==='score'){va=parseInt(a.cells[6]?.textContent)||0;vb=parseInt(b.cells[6]?.textContent)||0}return sortState.dir==='asc'?va-vb:vb-va}if(col==='change'){va=parseFloat(a.getAttribute('data-change'))||0;vb=parseFloat(b.getAttribute('data-change'))||0;return sortState.dir==='asc'?va-vb:vb-va}if(col==='corr'){va=parseFloat(a.getAttribute('data-corr'))||0;vb=parseFloat(b.getAttribute('data-corr'))||0;return sortState.dir==='asc'?va-vb:vb-va}if(col==='trend'){va=parseInt(a.getAttribute('data-trend'))||0;vb=parseInt(b.getAttribute('data-trend'))||0;return sortState.dir==='asc'?vb-va:va-vb}if(col==='code'){va=a.cells[1]?.textContent||'';vb=b.cells[1]?.textContent||''}else if(col==='name'){va=a.cells[2]?.textContent||'';vb=b.cells[2]?.textContent||''}else if(col==='board'){va=a.cells[3]?.textContent||'';vb=b.cells[3]?.textContent||''}else if(col==='title'){va=a.cells[4]?.textContent||'';vb=b.cells[4]?.textContent||''}else if(col==='cat'){va=a.cells[5]?.textContent||'';vb=b.cells[5]?.textContent||''}else if(col==='time'){va=a.cells[11]?.textContent||'';vb=b.cells[11]?.textContent||''}va=String(va);vb=String(vb);var cmp=va.localeCompare(vb,'zh-CN');return sortState.dir==='asc'?cmp:-cmp});rows.forEach(function(row,idx){row.cells[0].textContent=idx+1;tbody.appendChild(row)})}
+// K-line mini chart tooltip
+var tip=document.getElementById('klineTip'),svg=document.getElementById('klineSvg');
+document.getElementById('tableBody').addEventListener('mouseover',function(e){
+  var td=e.target.closest('td.name');if(!td)return hideTip();
+  var tr=td.closest('tr'),cs=tr.getAttribute('data-closes');if(!cs)return hideTip();
+  var arr=cs.split(',').map(Number);if(arr.length<2)return hideTip();
+  var min=Math.min.apply(null,arr),max=Math.max.apply(null,arr),range=max-min||1;
+  var w=200,h=60,pad=2,wx=(w-2*pad)/(arr.length-1);
+  var pts=arr.map(function(v,i){return (i*wx+pad)+','+(pad+(1-(v-min)/range)*(h-2*pad))});
+  var fillPts='0,'+(h-pad)+' '+pts.join(' ')+' '+(w-pad)+','+(h-pad);
+  svg.setAttribute('viewBox','0 0 '+w+' '+h);
+  svg.innerHTML='<defs><linearGradient id="kg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0f3460" stop-opacity="0.15"/><stop offset="100%" stop-color="#0f3460" stop-opacity="0"/></linearGradient></defs><polygon points="'+fillPts+'" fill="url(#kg)"/><polyline points="'+pts.join(' ')+'" fill="none" stroke="#0f3460" stroke-width="1.5"/>';
+  document.getElementById('tipHigh').textContent='最高:'+max.toFixed(2);
+  document.getElementById('tipLow').textContent='最低:'+min.toFixed(2);
+  tip.style.display='block';tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-30)+'px';
+  if(parseInt(tip.style.left)+220>window.innerWidth)tip.style.left=(e.clientX-220)+'px';
+});
+function hideTip(){tip.style.display='none'}
+document.getElementById('tableBody').addEventListener('mouseout',function(e){if(!e.target.closest('td.name'))hideTip()});
 </script>
 </body>
 </html>
