@@ -223,7 +223,6 @@ function Get-TrendPosition {
     $closes= foreach ($e in $Kline) { [double]$e[2] }
     $n = $Kline.Count
     # 突发量变 (criterion 3): last 10 days vol == last 230 days vol AND 阳线
-    $i3 = [Math]::Max(0, $n-3)
     $i10 = [Math]::Max(0, $n-10)
     $i230 = [Math]::Max(0, $n-230)
     $d10Vol  = ($vols[$i10..($n-1)] | Measure-Object -Maximum).Maximum
@@ -256,20 +255,24 @@ foreach ($ann in $allAnn) {
 }
 Write-Output "Unique stock codes: $($uniqueCodes.Count)"
 $klineMap = Get-KlineData -StockCodes $uniqueCodes
-# Supplement cache with K-line data (for tomorrow's PrevChangePct)
+# Supplement cache with K-line data (for tomorrow's PrevChangePct) — DON'T modify prevChangeMap used for display
 try {
-    $supCnt = 0
+    $supObj = @{}
     foreach ($code in $klineMap.Keys) {
         if (-not $prevChangeMap.ContainsKey($code) -and $klineMap[$code].Count -ge 2) {
             $kl = $klineMap[$code]
-            $chg = if ([double]$kl[-2][2] -ne 0) { [Math]::Round(([double]$kl[-1][2] - [double]$kl[-2][2]) / [double]$kl[-2][2] * 100, 2) } else { $null }
-            if ($chg -ne $null) { $prevChangeMap[$code] = $chg; $supCnt++ }
+            $chg = if ([double]$kl[-1][2] -ne 0) { [Math]::Round(([double]$kl[-1][2] - [double]$kl[-2][2]) / [double]$kl[-2][2] * 100, 2) } else { $null }
+            if ($chg -ne $null) { $supObj[$code] = $chg }
         }
     }
-    if ($supCnt -gt 0) {
-        $saveJson = $prevChangeMap | ConvertTo-Json -Compress
+    if ($supObj.Count -gt 0) {
+        # Merge with existing cache, save to file only
+        $merged = @{}
+        foreach ($k in $prevChangeMap.Keys) { $merged[$k] = $prevChangeMap[$k] }
+        foreach ($k in $supObj.Keys) { $merged[$k] = $supObj[$k] }
+        $saveJson = $merged | ConvertTo-Json -Compress
         [System.IO.File]::WriteAllText($CacheFile, $saveJson, [System.Text.UTF8Encoding]::new($false))
-        Write-Output "Supplemented cache: $supCnt stocks from K-line"
+        Write-Output "Supplemented cache: $($supObj.Count) stocks from K-line"
     }
 } catch { Write-Warning "Cache supplement failed: $($_.Exception.Message)" }
 
@@ -354,13 +357,13 @@ foreach ($item in $sorted) {
         }
     }
     if (-not $trendHtml) { $trendHtml = "<span class='trend-na'>-</span>" }
-    # K-line close prices for mini chart (last 20 days)
-    $closes20 = if ($klineMap.ContainsKey($item.Code) -and $klineMap[$item.Code].Count -ge 20) { ($klineMap[$item.Code][-20..-1] | ForEach-Object { [Math]::Round([double]$_[2], 2) }) -join ',' } else { '' }
+    # K-line OHLC data for mini K-line chart (last 20 days)
+    $klineData = if ($klineMap.ContainsKey($item.Code) -and $klineMap[$item.Code].Count -ge 20) { ($klineMap[$item.Code][-20..-1] | ForEach-Object { $o=[Math]::Round([double]$_[1],2); $h=[Math]::Round([double]$_[3],2); $l=[Math]::Round([double]$_[4],2); $c=[Math]::Round([double]$_[2],2); "$o,$h,$l,$c" }) -join '|' } else { '' }
     # EastMoney URL for stock code link
     $emPrefix = if ($item.Code -match '^(60|688)') {'sh'} else {'sz'}
-    $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html"
+    $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html#fullScreenChart"
     $itemsHtml += @"
-    <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore" data-closes="$closes20"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank" title="点击查看K线图">$($item.Code)</a></td><td class="name" data-code="$($item.Code)">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="time">$($item.Time)</td></tr>
+    <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore" data-kline="$klineData"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank" title="点击查看K线图">$($item.Code)</a></td><td class="name" data-code="$($item.Code)">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="time">$($item.Time)</td></tr>
 "@
     $i++
 }
@@ -466,7 +469,7 @@ tr.normal .score{color:#999}
 </table></div>
 <div class="footer">数据来源：巨潮资讯网(CNINFO) 每个工作日9:00更新 | 悬停名称看K线简图，点击代码看详细K线</div>
 </div>
-<div id="klineTip" class="kline-tip"><div class="tip-title">最近20日收盘价走势</div><svg id="klineSvg" width="200" height="60"></svg><div class="tip-stats"><span id="tipHigh">-</span><span id="tipLow">-</span></div></div>
+<div id="klineTip" class="kline-tip"><div class="tip-title">最近20日K线</div><svg id="klineSvg" width="200" height="60"></svg><div class="tip-stats"><span id="tipHigh">-</span><span id="tipLow">-</span></div></div>
 <script>
 function filterTable(){var q=document.getElementById('searchBox').value.toLowerCase(),cf=document.getElementById('catFilter').value,bf=document.getElementById('boardFilter').value,rows=document.querySelectorAll('#tableBody tr');rows.forEach(function(r){var c=r.cells[1]?.textContent.toLowerCase()||'',n=r.cells[2]?.textContent.toLowerCase()||'',t=r.cells[4]?.textContent.toLowerCase()||'',ct=r.cells[5]?.textContent.trim()||'',b=r.cells[3]?.textContent||'';r.style.display=(!q||c.includes(q)||n.includes(q)||t.includes(q))&&(!cf||ct===cf)&&(!bf||b===bf)?'':'none'})}
 var sortState={col:'score',dir:'desc'};
@@ -475,16 +478,28 @@ function sortTable(col){var ths=document.querySelectorAll('th.sortable');ths.for
 var tip=document.getElementById('klineTip'),svg=document.getElementById('klineSvg');
 document.getElementById('tableBody').addEventListener('mouseover',function(e){
   var td=e.target.closest('td.name');if(!td)return hideTip();
-  var tr=td.closest('tr'),cs=tr.getAttribute('data-closes');if(!cs)return hideTip();
-  var arr=cs.split(',').map(Number);if(arr.length<2)return hideTip();
-  var min=Math.min.apply(null,arr),max=Math.max.apply(null,arr),range=max-min||1;
-  var w=200,h=60,pad=2,wx=(w-2*pad)/(arr.length-1);
-  var pts=arr.map(function(v,i){return (i*wx+pad)+','+(pad+(1-(v-min)/range)*(h-2*pad))});
-  var fillPts='0,'+(h-pad)+' '+pts.join(' ')+' '+(w-pad)+','+(h-pad);
+  var tr=td.closest('tr'),kd=tr.getAttribute('data-kline');if(!kd)return hideTip();
+  var bars=kd.split('|').map(function(s){var p=s.split(',');return{o:+p[0],h:+p[1],l:+p[2],c:+p[3]}});
+  if(bars.length<2)return hideTip();
+  var allP=[],i;for(i=0;i<bars.length;i++){allP.push(bars[i].h,bars[i].l)}
+  var min=Math.min.apply(null,allP),max=Math.max.apply(null,allP),range=max-min||1;
+  var w=200,h=60,pt=4,pb=4,pl=2,pr=2,bw=(w-pl-pr)/bars.length,hw=Math.max(1,bw*0.6);
+  var scaleY=function(v){return pt+(1-(v-min)/range)*(h-pt-pb)};
+  var bodyW=Math.max(1,Math.min(hw-2,bw*0.8));
+  var html='';
+  for(i=0;i<bars.length;i++){
+    var b=bars[i],x=pl+i*bw+ (bw-hw)/2, cx=x+hw/2;
+    var yHigh=scaleY(b.h),yLow=scaleY(b.l),yOpen=scaleY(b.o),yClose=scaleY(b.c);
+    var isUp=b.c>=b.o;
+    html+='<line x1="'+cx+'" y1="'+yHigh+'" x2="'+cx+'" y2="'+yLow+'" stroke="#333" stroke-width="1"/>';
+    var topY=Math.min(yOpen,yClose),botY=Math.max(yOpen,yClose);
+    if(isUp){html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="#fff" stroke="#333" stroke-width="0.8"/>'}
+    else{html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="#000"/>'}
+  }
   svg.setAttribute('viewBox','0 0 '+w+' '+h);
-  svg.innerHTML='<defs><linearGradient id="kg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0f3460" stop-opacity="0.15"/><stop offset="100%" stop-color="#0f3460" stop-opacity="0"/></linearGradient></defs><polygon points="'+fillPts+'" fill="url(#kg)"/><polyline points="'+pts.join(' ')+'" fill="none" stroke="#0f3460" stroke-width="1.5"/>';
+  svg.innerHTML=html;
   document.getElementById('tipHigh').textContent='最高:'+max.toFixed(2);
-  document.getElementById('tipLow').textContent='最低:'+min.toFixed(2);
+  document.getElementById('tipLow').textContent='最低:'+min.toFixed(2)+' | 最近:'+bars[bars.length-1].c.toFixed(2);
   tip.style.display='block';tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-30)+'px';
   if(parseInt(tip.style.left)+220>window.innerWidth)tip.style.left=(e.clientX-220)+'px';
 });
