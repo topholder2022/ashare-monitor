@@ -256,6 +256,22 @@ foreach ($ann in $allAnn) {
 }
 Write-Output "Unique stock codes: $($uniqueCodes.Count)"
 $klineMap = Get-KlineData -StockCodes $uniqueCodes
+# Supplement cache with K-line data (for tomorrow's PrevChangePct)
+try {
+    $supCnt = 0
+    foreach ($code in $klineMap.Keys) {
+        if (-not $prevChangeMap.ContainsKey($code) -and $klineMap[$code].Count -ge 2) {
+            $kl = $klineMap[$code]
+            $chg = if ([double]$kl[-2][2] -ne 0) { [Math]::Round(([double]$kl[-1][2] - [double]$kl[-2][2]) / [double]$kl[-2][2] * 100, 2) } else { $null }
+            if ($chg -ne $null) { $prevChangeMap[$code] = $chg; $supCnt++ }
+        }
+    }
+    if ($supCnt -gt 0) {
+        $saveJson = $prevChangeMap | ConvertTo-Json -Compress
+        [System.IO.File]::WriteAllText($CacheFile, $saveJson, [System.Text.UTF8Encoding]::new($false))
+        Write-Output "Supplemented cache: $supCnt stocks from K-line"
+    }
+} catch { Write-Warning "Cache supplement failed: $($_.Exception.Message)" }
 
 # ============ 4. Process ============
 Write-Output "Processing announcements..."
@@ -269,7 +285,14 @@ foreach ($ann in $allAnn) {
     $dtStr = if ($timeMs) { (Get-Date "1970-01-01 00:00:00").AddMilliseconds([long]$timeMs).ToString('HH:mm:ss') } else {'--'}
     $pi = $stockPop[$code]
     $ps = if ($pi) {$pi.Score}else{10}; $mcap = if ($pi){$pi.Mcap}else{0}; $cp = if($pi){$pi.ChangePct}else{$null}
-    $prevCp = if ($prevChangeMap.ContainsKey($code)) { $prevChangeMap[$code] } else { $null }
+    $prevCp = $null
+    if ($prevChangeMap.ContainsKey($code)) { $prevCp = $prevChangeMap[$code] }
+    elseif ($klineMap.ContainsKey($code) -and $klineMap[$code].Count -ge 3) {
+        $kl = $klineMap[$code]
+        $pc = [double]$kl[-2][2]
+        $ppc = [double]$kl[-3][2]
+        if ($ppc -ne 0) { $prevCp = [Math]::Round(($pc - $ppc) / $ppc * 100, 2) }
+    }
     $cat = Get-Category -T $title
     $catScore = $cat.P; $summary = $cat.S; $catLabel = Get-CategoryLabel -P $catScore
     $totalScore = [Math]::Round($ps*0.4 + $catScore*0.6, 0)
