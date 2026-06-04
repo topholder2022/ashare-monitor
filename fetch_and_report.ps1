@@ -327,8 +327,8 @@ $itemsHtml = ""; $i=1
 foreach ($item in $sorted) {
     $cc = if ($item.Score -ge 80){'high'}elseif($item.Score -ge 60){'medium'}else{'normal'}
     $chv = 999
-    $prevCp = $item.PrevChangePct
-    $ch = if ($prevCp -ne $null){$c='';$chv=[Math]::Round($prevCp,1);if($prevCp-gt0){$c='up'}elseif($prevCp-lt0){$c='down'};"<span class='change $c'>$chv%</span>"}else{''}
+    $cpNow = $item.ChangePct
+    $ch = if ($cpNow -ne $null){$c='';$chv=[Math]::Round($cpNow,1);if($cpNow-gt0){$c='up'}elseif($cpNow-lt0){$c='down'};"<span class='change $c'>$chv%</span>"}else{''}
     $ms = if($item.Mcap-gt0){"{0:N0}" -f [Math]::Round($item.Mcap/1e8)+"亿"}else{''}
     $se = $item.Summary -replace '"','&quot;'
     # Correlation cell HTML
@@ -456,15 +456,15 @@ tr.normal .score{color:#999}
 </style>
 </head>
 <body>
-<div class="header"><h1>A股公告热门排行（趋势精选）</h1><div class="subtitle">$Date | 仅显示符合趋势位置评估标准的股票公告</div><div class="stats">共 $total1 条公告 更新时间 $gt | 涨跌幅数据为上一个交易日</div></div>
+<div class="header"><h1>A股公告热门排行（趋势精选）</h1><div class="subtitle">$Date | 仅显示符合趋势位置评估标准的股票公告</div><div class="stats">共 $total1 条公告 更新时间 $gt | 涨跌幅数据为最新交易日</div></div>
 <div class="container">
 <div class="controls">
 <label>搜索:</label><input type="text" class="search-box" id="searchBox" placeholder="股票代码/名称/标题..." oninput="filterTable()">
 <label>分类:</label><select class="filter-select" id="catFilter" onchange="filterTable()"><option value="">全部分类</option><option>业绩预告</option><option>分红送转</option><option>并购重组</option><option>定期报告</option><option>股东变动</option><option>重大事项</option><option>公司治理</option><option>其他</option></select>
 <label>板块:</label><select class="filter-select" id="boardFilter" onchange="filterTable()"><option value="">全部板块</option><option>沪市主板</option><option>深市主板</option><option>中小板</option><option>创业板</option><option>科创板</option></select>
-<button class="btn-sort" onclick="sortTable('change')" id="sortChangeBtn">按昨日涨跌幅排序</button>
+<button class="btn-sort" onclick="sortTable('change')" id="sortChangeBtn">按最新涨跌幅排序</button>
 </div>
-<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">昨日涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
+<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
 </table></div>
 <div class="footer">数据来源：巨潮资讯网(CNINFO) 每个工作日9:00更新 | 悬停名称看K线简图，点击代码看详细K线</div>
