@@ -84,7 +84,7 @@ tr.normal .score{color:#999}
 </style>
 </head>
 <body>
-<div class="header"><h1>A股公告热门排行（趋势精选）</h1><div class="subtitle">2026-06-04 | 仅显示符合趋势位置评估标准的股票公告</div><div class="stats">共 187 条公告 更新时间 23:35 | 涨跌幅数据为上一个交易日</div></div>
+<div class="header"><h1>A股公告热门排行（趋势精选）</h1><div class="subtitle">2026-06-04 | 仅显示符合趋势位置评估标准的股票公告</div><div class="stats">共 187 条公告 更新时间 23:39 | 涨跌幅数据为上一个交易日</div></div>
 <div class="container">
 <div class="controls">
 <label>搜索:</label><input type="text" class="search-box" id="searchBox" placeholder="股票代码/名称/标题..." oninput="filterTable()">
@@ -113,16 +113,16 @@ document.getElementById('tableBody').addEventListener('mouseover',function(e){
   var min=Math.min.apply(null,allP),max=Math.max.apply(null,allP),range=max-min||1;
   var w=200,h=60,pt=4,pb=4,pl=2,pr=2,bw=(w-pl-pr)/bars.length,hw=Math.max(1,bw*0.6);
   var scaleY=function(v){return pt+(1-(v-min)/range)*(h-pt-pb)};
-  var red='#e74c3c',green='#27ae60',bodyW=Math.max(1,Math.min(hw-2,bw*0.8));
+  var bodyW=Math.max(1,Math.min(hw-2,bw*0.8));
   var html='';
   for(i=0;i<bars.length;i++){
     var b=bars[i],x=pl+i*bw+ (bw-hw)/2, cx=x+hw/2;
     var yHigh=scaleY(b.h),yLow=scaleY(b.l),yOpen=scaleY(b.o),yClose=scaleY(b.c);
     var isUp=b.c>=b.o;
-    var col=isUp?red:green;
-    html+='<line x1="'+cx+'" y1="'+yHigh+'" x2="'+cx+'" y2="'+yLow+'" stroke="'+col+'" stroke-width="1"/>';
+    html+='<line x1="'+cx+'" y1="'+yHigh+'" x2="'+cx+'" y2="'+yLow+'" stroke="#333" stroke-width="1"/>';
     var topY=Math.min(yOpen,yClose),botY=Math.max(yOpen,yClose);
-    html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="'+col+'"/>';
+    if(isUp){html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="#fff" stroke="#333" stroke-width="0.8"/>'}
+    else{html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="#000"/>'}
   }
   svg.setAttribute('viewBox','0 0 '+w+' '+h);
   svg.innerHTML=html;
