@@ -464,7 +464,7 @@ tr.normal .score{color:#999}
 <label>板块:</label><select class="filter-select" id="boardFilter" onchange="filterTable()"><option value="">全部板块</option><option>沪市主板</option><option>深市主板</option><option>中小板</option><option>创业板</option><option>科创板</option></select>
 <button class="btn-sort" onclick="sortTable('change')" id="sortChangeBtn">按最新涨跌幅排序</button>
 <button class="btn-sort" onclick="exportTxt()" id="exportBtn">导出列表</button>
-<button class="btn-sort" onclick="refreshPage()" id="refreshBtn">⟳ 手动刷新</button>
+<button class="btn-sort" onclick="refreshPage()" id="refreshBtn" style="display:none">⟳ 手动刷新</button>
 </div>
 <div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
