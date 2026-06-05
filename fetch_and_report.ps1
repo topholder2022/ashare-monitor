@@ -464,6 +464,7 @@ tr.normal .score{color:#999}
 <label>板块:</label><select class="filter-select" id="boardFilter" onchange="filterTable()"><option value="">全部板块</option><option>沪市主板</option><option>深市主板</option><option>中小板</option><option>创业板</option><option>科创板</option></select>
 <button class="btn-sort" onclick="sortTable('change')" id="sortChangeBtn">按最新涨跌幅排序</button>
 <button class="btn-sort" onclick="exportTxt()" id="exportBtn">导出列表</button>
+<button class="btn-sort" onclick="refreshPage()" id="refreshBtn">⟳ 手动刷新</button>
 </div>
 <div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
@@ -508,6 +509,8 @@ function hideTip(){tip.style.display='none'}
 document.getElementById('tableBody').addEventListener('mouseout',function(e){if(!e.target.closest('td.name'))hideTip()});
 // Export visible stock codes to txt
 function exportTxt(){var d=new Date(),ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(),hh=('0'+d.getHours()).slice(-2),fn=ymd+hh+'.txt';var rows=document.querySelectorAll('#tableBody tr');if(!rows.length)return alert('无数据可导出');var codes=[];rows.forEach(function(r){if(r.style.display!=='none'){var c=r.cells[1]?.textContent;if(c)codes.push(c)}});if(!codes.length)return alert('无数据可导出');var blob=new Blob([codes.join('\r\n')],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href)}
+// Manual refresh — trigger GitHub Actions then reload
+function refreshPage(){var btn=document.getElementById('refreshBtn');btn.textContent='⏳ 刷新中...';btn.disabled=true;window.open('https://github.com/topholder2022/ashare-monitor/actions/workflows/daily-deploy.yml','_blank');window.location.href=window.location.pathname+'?_='+Date.now()}
 </script>
 </body>
 </html>
