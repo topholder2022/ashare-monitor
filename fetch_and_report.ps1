@@ -368,7 +368,7 @@ foreach ($item in $sorted) {
     $klineData = if ($klineMap.ContainsKey($item.Code) -and $klineMap[$item.Code].Count -ge 20) { ($klineMap[$item.Code][-20..-1] | ForEach-Object { $o=[Math]::Round([double]$_[1],2); $h=[Math]::Round([double]$_[3],2); $l=[Math]::Round([double]$_[4],2); $c=[Math]::Round([double]$_[2],2); "$o,$h,$l,$c" }) -join '|' } else { '' }
     # EastMoney URL for stock code link
     $emPrefix = if ($item.Code -match '^(60|688)') {'sh'} else {'sz'}
-    $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html#fullScreenChart"
+    $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html"
     $itemsHtml += @"
     <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore" data-kline="$klineData"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank" title="点击查看K线图">$($item.Code)</a></td><td class="name" data-code="$($item.Code)">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="time">$($item.Time)</td></tr>
 "@
