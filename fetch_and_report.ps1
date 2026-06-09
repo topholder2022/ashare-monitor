@@ -287,7 +287,14 @@ foreach ($ann in $allAnn) {
     if ($code -notmatch '^\d{6}$') { continue }
     $dtStr = if ($timeMs) { (Get-Date "1970-01-01 00:00:00").AddMilliseconds([long]$timeMs).ToString('HH:mm:ss') } else {'--'}
     $pi = $stockPop[$code]
-    $ps = if ($pi) {$pi.Score}else{10}; $mcap = if ($pi){$pi.Mcap}else{0}; $cp = if($pi){$pi.ChangePct}else{$null}
+    $ps = if ($pi) {$pi.Score}else{10}; $mcap = if ($pi){$pi.Mcap}else{0}
+    # Get ChangePct from stockPop first, then K-line as fallback
+    $cp = if ($pi) { $pi.ChangePct } else { $null }
+    if ($cp -eq $null -and $klineMap.ContainsKey($code) -and $klineMap[$code].Count -ge 2) {
+        $kl = $klineMap[$code]
+        $c1 = [double]$kl[-1][2]; $c0 = [double]$kl[-2][2]
+        if ($c0 -ne 0) { $cp = [Math]::Round(($c1 - $c0) / $c0 * 100, 2) }
+    }
     $prevCp = $null
     if ($prevChangeMap.ContainsKey($code)) { $prevCp = $prevChangeMap[$code] }
     elseif ($klineMap.ContainsKey($code) -and $klineMap[$code].Count -ge 3) {
