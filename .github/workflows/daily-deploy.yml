@@ -2,9 +2,16 @@ name: 每日自动部署
 
 on:
   schedule:
-    # 工作日 9:00 CST (UTC+8) = 1:00 UTC
-    - cron: '0 1 * * 1-5'
+    # 工作日 9:00-11:00 CST (UTC+8)，每30分钟一次保障准时
+    - cron: '0 1 * * 1-5'    # 9:00
+    - cron: '30 1 * * 1-5'   # 9:30
+    - cron: '0 2 * * 1-5'    # 10:00
+    - cron: '30 2 * * 1-5'   # 10:30
   workflow_dispatch:  # 支持手动触发
+
+concurrency:
+  group: daily-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
