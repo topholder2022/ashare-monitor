@@ -31,15 +31,16 @@ try {
     $sha = $get.sha
     Write-Output "Current file SHA: $($sha.Substring(0,7))..."
 } catch {
-    Write-Output "File doesn't exist yet, will create new"
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Write-Output "File not found (HTTP $statusCode), will create new"
 }
 
 # Update file via Contents API
 $body = @{
-    message = "Daily update $today"
+    message = "Daily update $today [$((Get-Date -Format 'HH:mm'))]"
     content = $content
     branch = "master"
-} | ConvertTo-Json
+} | ConvertTo-Json -Depth 10
 if ($sha) { $body = $body -replace '}$',",`"sha`":`"$sha`"}" }
 
 try {
@@ -48,7 +49,9 @@ try {
     Write-Output "Commit: $($result.commit.sha)"
     Write-Output "https://$Owner.github.io/$Repo/"
 } catch {
-    Write-Error "Deploy failed: $($_.Exception.Message)"
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    try { $errDetail = ($_.ErrorDetails.Message | ConvertFrom-Json).message } catch { $errDetail = $_.Exception.Message }
+    Write-Error "Deploy failed (HTTP $statusCode): $errDetail"
     exit 1
 }
 

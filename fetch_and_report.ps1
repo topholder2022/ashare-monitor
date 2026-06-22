@@ -133,7 +133,7 @@ try {
     $tooEarly = ($saveHour -eq 9 -and $saveMin -lt 30) -or ($saveHour -lt 9)
     $hasNonZero = ($saveObj.Values | Where-Object { $_ -ne 0 }).Count -gt 2
     if ($saveObj.Count -gt 0 -and $hasNonZero -and -not $tooEarly) {
-        $saveJson = $saveObj | ConvertTo-Json -Compress
+        $saveJson = $saveObj | ConvertTo-Json -Compress -Depth 5
         [System.IO.File]::WriteAllText($CacheFile, $saveJson, [System.Text.UTF8Encoding]::new($false))
         Write-Output "Saved cache: $($saveObj.Count) stocks"
     } elseif ($saveObj.Count -gt 0) {
