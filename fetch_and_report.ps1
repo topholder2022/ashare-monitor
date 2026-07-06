@@ -431,7 +431,7 @@ body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;backgr
 .btn-sort{padding:6px 14px;background:#fff;border:1px solid #0f3460;border-radius:6px;font-size:13px;color:#0f3460;cursor:pointer;transition:all .2s;white-space:nowrap}
 .btn-sort:hover{background:#0f3460;color:#fff}
 .btn-sort.active{background:#0f3460;color:#fff}
-.table-wrapper{background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);overflow:hidden}
+.table-wrapper{background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead{background:#fafafa;border-bottom:2px solid #e8e8e8}
 th{padding:12px 14px;text-align:left;font-weight:600;color:#555;font-size:12px;letter-spacing:.5px;white-space:nowrap;user-select:none}
@@ -491,6 +491,7 @@ tr.normal .score{color:#999}
 .trend-tag.trend-surge{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
 .trend-na{color:#ccc;font-size:11px}
 .forecast-cell{text-align:center;min-width:80px;font-size:12px}
+th.forecast-th{min-width:80px;text-align:center}
 .forecast-link{text-decoration:none;cursor:pointer;font-weight:600;display:inline-block;padding:2px 8px;border-radius:4px}
 .forecast-link:hover{text-decoration:underline;opacity:.8}
 .forecast-link.up{color:#e74c3c;background:#fde8e8}
@@ -511,7 +512,7 @@ tr.normal .score{color:#999}
 <button class="btn-sort" onclick="exportTxt()" id="exportBtn">导出列表</button>
 <button class="btn-sort" onclick="refreshPage()" id="refreshBtn" style="display:none">⟳ 手动刷新</button>
 </div>
-<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th>业绩预告</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
+<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="forecast-th">业绩预告</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
 </table></div>
 <div class="footer">数据来源：巨潮资讯网(CNINFO) 每个工作日9:00更新 | 悬停名称看K线简图，点击代码看详细K线</div>
