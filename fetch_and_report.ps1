@@ -187,6 +187,36 @@ function Get-Sentiment {
     return 0
 }
 
+# ============ 3.6 Performance Forecast Analysis ============
+function Get-PerformanceForecast {
+    param([string]$Title, [string]$DateStr, [string]$Url)
+    $result = @{HasForecast=$false; Date="-"; Tooltip=""; Class=""; LinkUrl=""}
+    if ($Title -match '业绩预增|业绩快报|业绩预告|业绩修正|盈利预告|半年度业绩|一季度业绩|三季度业绩|年度业绩') {
+        $result.HasForecast = $true
+        $result.Date = $DateStr  # Show the announcement date
+        $result.LinkUrl = $Url
+        # Extract ratio from title
+        if ($Title -match '预增\s*(\d+(\.\d+)?)\s*[%-]') {
+            $result.Tooltip = "业绩预增 $($matches[1])%"; $result.Class = "up"
+        } elseif ($Title -match '增长\s*(\d+(\.\d+)?)\s*%') {
+            $result.Tooltip = "增长 $($matches[1])%"; $result.Class = "up"
+        } elseif ($Title -match '(\d+(\.\d+)?)\s*%\s*[至到]\s*(\d+(\.\d+)?)\s*%') {
+            $result.Tooltip = "增幅区间 $($matches[1])%-$($matches[3])%"; $result.Class = "up"
+        } elseif ($Title -match '扭亏为盈') {
+            $result.Tooltip = "扭亏为盈"; $result.Class = "up"
+        } elseif ($Title -match '预亏|业绩亏损|大幅下降|大幅下滑|大幅下跌') {
+            $result.Tooltip = "业绩预亏"; $result.Class = "down"
+        } elseif ($Title -match '大增|大幅上升|大幅增长|大幅提升') {
+            $result.Tooltip = "业绩大幅预增"; $result.Class = "up"
+        } elseif ($Title -match '预增') {
+            $result.Tooltip = "业绩预增"; $result.Class = "up"
+        } else {
+            $result.Tooltip = "业绩预告"; $result.Class = "neutral"
+        }
+    }
+    return $result
+}
+
 # ============ 3.7 Trend Position Analysis ============
 function Get-KlineData {
     param([string[]]$StockCodes)
@@ -320,7 +350,8 @@ foreach ($ann in $allAnn) {
         else { $corrScore = 50; $corrLabel = "中性" }
     }
     $trendLbls = if ($klineMap.ContainsKey($code)) { Get-TrendPosition -Kline $klineMap[$code] } else { @() }
-    $null = $processed.Add([PSCustomObject]@{Score=$totalScore; Code=$code; Name=$name; Title=$title; Category=$catLabel; Time=$dtStr; Board=$board; Mcap=$mcap; ChangePct=$cp; PrevChangePct=$prevCp; Summary=$summary; Sentiment=$sentimentLabel; CorrScore=$corrScore; CorrLabel=$corrLabel; TrendLabels=$trendLbls; Url="http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"})
+    $forecastInfo = Get-PerformanceForecast -Title $title -DateStr $Date -Url "http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"
+    $null = $processed.Add([PSCustomObject]@{Score=$totalScore; Code=$code; Name=$name; Title=$title; Category=$catLabel; Time=$dtStr; Board=$board; Mcap=$mcap; ChangePct=$cp; PrevChangePct=$prevCp; Summary=$summary; Sentiment=$sentimentLabel; CorrScore=$corrScore; CorrLabel=$corrLabel; TrendLabels=$trendLbls; Url="http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"; ForecastHas=$forecastInfo.HasForecast; ForecastDate=$forecastInfo.Date; ForecastTooltip=$forecastInfo.Tooltip; ForecastClass=$forecastInfo.Class; ForecastUrl=$forecastInfo.LinkUrl})
 }
 $sorted = $processed | Sort-Object Score -Descending
 $totalBefore = $sorted.Count
@@ -369,8 +400,9 @@ foreach ($item in $sorted) {
     # EastMoney URL for stock code link
     $emPrefix = if ($item.Code -match '^(60|688)') {'sh'} else {'sz'}
     $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html"
+    $fc = if ($item.ForecastHas) { "<a href='$($item.ForecastUrl)' target='_blank' title='$($item.ForecastTooltip)' class='forecast-link $($item.ForecastClass)'>$($item.ForecastDate)</a>" } else { "-" }
     $itemsHtml += @"
-    <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore" data-kline="$klineData"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank" title="点击查看K线图">$($item.Code)</a></td><td class="name" data-code="$($item.Code)">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="time">$($item.Time)</td></tr>
+    <tr class="$cc" data-change="$chv" data-corr="$dcorr" data-trend="$trendScore" data-forecast="$($item.ForecastHas)" data-kline="$klineData"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank" title="点击查看K线图">$($item.Code)</a></td><td class="name" data-code="$($item.Code)">$($item.Name)</td><td class="board">$($item.Board)</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($item.Category)</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentimentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fc</td><td class="time">$($item.Time)</td></tr>
 "@
     $i++
 }
@@ -458,6 +490,12 @@ tr.normal .score{color:#999}
 .trend-tag.trend-hold{background:#e3f2fd;color:#1565c0;border:1px solid #90caf9}
 .trend-tag.trend-surge{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
 .trend-na{color:#ccc;font-size:11px}
+.forecast-cell{text-align:center;min-width:80px;font-size:12px}
+.forecast-link{text-decoration:none;cursor:pointer;font-weight:600;display:inline-block;padding:2px 8px;border-radius:4px}
+.forecast-link:hover{text-decoration:underline;opacity:.8}
+.forecast-link.up{color:#e74c3c;background:#fde8e8}
+.forecast-link.down{color:#27ae60;background:#e8f5e9}
+.forecast-link.neutral{color:#0f3460;background:#e3f2fd}
 .footer{text-align:center;padding:20px;color:#bbb;font-size:12px}
 @media(max-width:768px){.container{padding:0 8px}th,td{padding:8px 6px;font-size:12px}.header h1{font-size:18px}.board,.mcap,.change-cell{display:none}.title-col{max-width:200px}}
 </style>
@@ -473,7 +511,7 @@ tr.normal .score{color:#999}
 <button class="btn-sort" onclick="exportTxt()" id="exportBtn">导出列表</button>
 <button class="btn-sort" onclick="refreshPage()" id="refreshBtn" style="display:none">⟳ 手动刷新</button>
 </div>
-<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
+<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" data-col="code" onclick="sortTable('code')">代码</th><th class="sortable" data-col="name" onclick="sortTable('name')">名称</th><th class="sortable" data-col="board" onclick="sortTable('board')">板块</th><th class="sortable" data-col="title" onclick="sortTable('title')">公告标题</th><th class="sortable" data-col="cat" onclick="sortTable('cat')">分类</th><th class="sortable asc" data-col="score" onclick="sortTable('score')">热度</th><th>市值</th><th class="sortable" data-col="change" onclick="sortTable('change')">最新涨跌幅</th><th class="sortable" data-col="corr" onclick="sortTable('corr')">关联分析</th><th class="sortable" data-col="trend" onclick="sortTable('trend')">趋势位置</th><th>业绩预告</th><th class="sortable" data-col="time" onclick="sortTable('time')">时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
 </table></div>
 <div class="footer">数据来源：巨潮资讯网(CNINFO) 每个工作日9:00更新 | 悬停名称看K线简图，点击代码看详细K线</div>
@@ -482,7 +520,7 @@ tr.normal .score{color:#999}
 <script>
 function filterTable(){var q=document.getElementById('searchBox').value.toLowerCase(),cf=document.getElementById('catFilter').value,bf=document.getElementById('boardFilter').value,rows=document.querySelectorAll('#tableBody tr');rows.forEach(function(r){var c=r.cells[1]?.textContent.toLowerCase()||'',n=r.cells[2]?.textContent.toLowerCase()||'',t=r.cells[4]?.textContent.toLowerCase()||'',ct=r.cells[5]?.textContent.trim()||'',b=r.cells[3]?.textContent||'';r.style.display=(!q||c.includes(q)||n.includes(q)||t.includes(q))&&(!cf||ct===cf)&&(!bf||b===bf)?'':'none'})}
 var sortState={col:'score',dir:'desc'};
-function sortTable(col){var ths=document.querySelectorAll('th.sortable');ths.forEach(function(t){t.classList.remove('asc','desc')});var th=document.querySelector('th[data-col="'+col+'"]');if(sortState.col===col){sortState.dir=sortState.dir==='asc'?'desc':'asc'}else{sortState.col=col;sortState.dir='desc'}th.classList.add(sortState.dir);var tbody=document.getElementById('tableBody'),rows=Array.from(tbody.querySelectorAll('tr'));rows.sort(function(a,b){var va,vb;if(col==='score'||col==='rank'){va=parseInt(a.cells[0]?.textContent)||0;vb=parseInt(b.cells[0]?.textContent)||0;if(col==='score'){va=parseInt(a.cells[6]?.textContent)||0;vb=parseInt(b.cells[6]?.textContent)||0}return sortState.dir==='asc'?va-vb:vb-va}if(col==='change'){va=parseFloat(a.getAttribute('data-change'))||0;vb=parseFloat(b.getAttribute('data-change'))||0;return sortState.dir==='asc'?va-vb:vb-va}if(col==='corr'){va=parseFloat(a.getAttribute('data-corr'))||0;vb=parseFloat(b.getAttribute('data-corr'))||0;return sortState.dir==='asc'?va-vb:vb-va}if(col==='trend'){va=parseInt(a.getAttribute('data-trend'))||0;vb=parseInt(b.getAttribute('data-trend'))||0;return sortState.dir==='asc'?vb-va:va-vb}if(col==='code'){va=a.cells[1]?.textContent||'';vb=b.cells[1]?.textContent||''}else if(col==='name'){va=a.cells[2]?.textContent||'';vb=b.cells[2]?.textContent||''}else if(col==='board'){va=a.cells[3]?.textContent||'';vb=b.cells[3]?.textContent||''}else if(col==='title'){va=a.cells[4]?.textContent||'';vb=b.cells[4]?.textContent||''}else if(col==='cat'){va=a.cells[5]?.textContent||'';vb=b.cells[5]?.textContent||''}else if(col==='time'){va=a.cells[11]?.textContent||'';vb=b.cells[11]?.textContent||''}va=String(va);vb=String(vb);var cmp=va.localeCompare(vb,'zh-CN');return sortState.dir==='asc'?cmp:-cmp});rows.forEach(function(row,idx){row.cells[0].textContent=idx+1;tbody.appendChild(row)})}
+function sortTable(col){var ths=document.querySelectorAll('th.sortable');ths.forEach(function(t){t.classList.remove('asc','desc')});var th=document.querySelector('th[data-col="'+col+'"]');if(sortState.col===col){sortState.dir=sortState.dir==='asc'?'desc':'asc'}else{sortState.col=col;sortState.dir='desc'}th.classList.add(sortState.dir);var tbody=document.getElementById('tableBody'),rows=Array.from(tbody.querySelectorAll('tr'));rows.sort(function(a,b){var va,vb;if(col==='score'||col==='rank'){va=parseInt(a.cells[0]?.textContent)||0;vb=parseInt(b.cells[0]?.textContent)||0;if(col==='score'){va=parseInt(a.cells[6]?.textContent)||0;vb=parseInt(b.cells[6]?.textContent)||0}return sortState.dir==='asc'?va-vb:vb-va}if(col==='change'){va=parseFloat(a.getAttribute('data-change'))||0;vb=parseFloat(b.getAttribute('data-change'))||0;return sortState.dir==='asc'?va-vb:vb-va}if(col==='corr'){va=parseFloat(a.getAttribute('data-corr'))||0;vb=parseFloat(b.getAttribute('data-corr'))||0;return sortState.dir==='asc'?va-vb:vb-va}if(col==='trend'){va=parseInt(a.getAttribute('data-trend'))||0;vb=parseInt(b.getAttribute('data-trend'))||0;return sortState.dir==='asc'?vb-va:va-vb}if(col==='code'){va=a.cells[1]?.textContent||'';vb=b.cells[1]?.textContent||''}else if(col==='name'){va=a.cells[2]?.textContent||'';vb=b.cells[2]?.textContent||''}else if(col==='board'){va=a.cells[3]?.textContent||'';vb=b.cells[3]?.textContent||''}else if(col==='title'){va=a.cells[4]?.textContent||'';vb=b.cells[4]?.textContent||''}else if(col==='cat'){va=a.cells[5]?.textContent||'';vb=b.cells[5]?.textContent||''}else if(col==='time'){va=a.cells[12]?.textContent||'';vb=b.cells[12]?.textContent||''}va=String(va);vb=String(vb);var cmp=va.localeCompare(vb,'zh-CN');return sortState.dir==='asc'?cmp:-cmp});rows.forEach(function(row,idx){row.cells[0].textContent=idx+1;tbody.appendChild(row)})}
 // K-line mini chart tooltip
 var tip=document.getElementById('klineTip'),svg=document.getElementById('klineSvg');
 document.getElementById('tableBody').addEventListener('mouseover',function(e){
