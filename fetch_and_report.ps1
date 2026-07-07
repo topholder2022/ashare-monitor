@@ -11,7 +11,7 @@ param(
 
 $OutputDate = $Date -replace '-', ''
 $OutputFile = Join-Path $OutputDir "$Date.html"
-$TDXDir = "F:\desktop backup\开心果V2025"
+$TDXDir = "F:\desktop backup\TDXKXGV2025"
 $TDX_SH_LDay = "$TDXDir\vipdoc\sh\lday"
 $TDX_SZ_LDay = "$TDXDir\vipdoc\sz\lday"
 
@@ -218,6 +218,18 @@ foreach ($annItem in $allAnn) {
 $sorted = $processed | Sort-Object Score -Descending
 Write-Output "Final: $($sorted.Count) items"
 
+# Group by stock: keep top item per stock, stash sub-items for hover
+$stockGroups = $sorted | Group-Object Code
+$groupedItems = @()
+foreach ($g in $stockGroups) {
+    $top = $g.Group | Sort-Object Score -Descending | Select-Object -First 1
+    $subs = $g.Group | Sort-Object Score -Descending | Select-Object -Skip 1
+    $top | Add-Member -NotePropertyName Subs -NotePropertyValue $subs -Force
+    $groupedItems += $top
+}
+$sorted = $groupedItems | Sort-Object Score -Descending
+Write-Output "Grouped: $($sorted.Count) stocks (with subs for hover)"
+
 # ============ 5. Generate HTML ============
 Write-Output "Step 5: Generating HTML..."
 $boardMap = @{"A"="沪市主板";"B"="深市主板";"C"="创业板";"K"="科创板";"O"="其他"}
@@ -248,8 +260,25 @@ foreach ($item in $sorted) {
     $fcHtml = if($item.FH){"<a href='$($item.Url)' target='_blank' title='$($item.FT)' class='forecast-link $($item.FC)'>$($item.FD)</a>"}else{"-"}
     $emPrefix = if($item.Code-match'^(60|688)'){'sh'}else{'sz'}
     $emUrl = "http://qt.gtimg.cn/q=$emPrefix$($item.Code)"
+    # Build sub-items data (pipe-separated "title|url" entries, double-pipe between items)
+    $subData = ""; $hasSubs = $false; $subCount = 0
+    if ($item.Subs -and $item.Subs.Count -gt 0) {
+        $hasSubs = $true; $subCount = $item.Subs.Count
+        $subParts = @()
+        foreach ($s in $item.Subs) {
+            $tClean = $s.Title -replace '"','&quot;'
+            $sPrefix = if($s.Code-match'^(60|688)'){'sh'}else{'sz'}
+            $subParts += "$tClean|$($s.Url)"
+        }
+        $subData = $subParts -join "||"
+    }
+    $titleCell = if($hasSubs) {
+        "<span class='title-main' data-subs='$subData'><a href='$($item.Url)' target='_blank' title='$se'>$($item.Title)</a><span class='sub-badge'>+$subCount</span></span><div class='sub-popup' style='display:none'></div>"
+    } else {
+        "<a href='$($item.Url)' target='_blank' title='$se'>$($item.Title)</a>"
+    }
     $itemsHtml += @"
-    <tr class="$cc" data-change="$chv" data-corr="$($item.CS)" data-trend="$trendScore"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank">$($item.Code)</a></td><td class="name">$($item.Name)</td><td class="board">$($boardMap[$item.Board])</td><td class="title-col" title="$se"><a href="$($item.Url)" target="_blank" title="$se">$($item.Title)</a></td><td class="cat"><span class="cat-tag $cc">$($catLabel[[int]$item.Cat])</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fcHtml</td><td class="time">$($item.Time)</td></tr>
+    <tr class="$cc" data-change="$chv" data-corr="$($item.CS)" data-trend="$trendScore"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank">$($item.Code)</a></td><td class="name">$($item.Name)</td><td class="board">$($boardMap[$item.Board])</td><td class="title-col">$titleCell</td><td class="cat"><span class="cat-tag $cc">$($catLabel[[int]$item.Cat])</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fcHtml</td><td class="time">$($item.Time)</td></tr>
 "@
     $i++
 }
@@ -305,6 +334,15 @@ tr.high .score{color:#e74c3c}tr.medium .score{color:#e67e22}
 .forecast-cell{text-align:center;min-width:80px}
 .forecast-link{text-decoration:none;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block}
 .forecast-link:hover{text-decoration:underline}
+.sub-badge{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;background:#0f3460;color:#fff;font-size:10px;font-weight:700;line-height:1.4;vertical-align:middle;cursor:help}
+.title-main{position:relative;cursor:pointer}
+.title-main:hover .sub-popup,.sub-popup:hover{display:block!important}
+.sub-popup{position:fixed;z-index:9999;background:#fff;border:1px solid #d9d9d9;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:8px 0;max-height:300px;overflow-y:auto;min-width:320px;max-width:500px}
+.sub-popup .sub-item{padding:6px 14px;font-size:12px;color:#333;cursor:pointer;display:block;text-decoration:none;border-bottom:1px solid #f0f0f0}
+.sub-popup .sub-item:last-child{border-bottom:none}
+.sub-popup .sub-item:hover{background:#f0f4ff;color:#0f3460}
+.sub-popup .sub-item .sub-url{color:#999;font-size:11px;text-decoration:none}
+.sub-popup .sub-item:hover .sub-url{color:#0f3460}
 .forecast-link.up{color:#e74c3c;background:#fde8e8}
 .forecast-link.down{color:#27ae60;background:#e8f5e9}
 .forecast-link.neutral{color:#0f3460;background:#e3f2fd}
@@ -325,6 +363,7 @@ tr.high .score{color:#e74c3c}tr.medium .score{color:#e67e22}
 <script>
 function filterTable(){var q=document.getElementById('searchBox').value.toLowerCase(),rows=document.querySelectorAll('#tableBody tr');rows.forEach(function(r){var m=false;for(var i=1;i<=4;i++){if(r.cells[i]?.textContent.toLowerCase().includes(q)){m=true;break}}r.style.display=m||!q?'':'none'})}
 function sortTable(c){var t=document.getElementById('tableBody'),r=Array.from(t.querySelectorAll('tr'));var d=t.getAttribute('d')==='a'?'d':'a';t.setAttribute('d',d);r.sort(function(a,b){var v1=a.cells[c]?.textContent||'',v2=b.cells[c]?.textContent||'';var n1=parseFloat(v1),n2=parseFloat(v2);if(!isNaN(n1)&&!isNaN(n2)){return d==='a'?n1-n2:n2-n1}return d==='a'?v1.localeCompare(v2,'zh-CN'):v2.localeCompare(v1,'zh-CN')});r.forEach(function(x,i){x.cells[0].textContent=i+1;t.appendChild(x)})}
+document.addEventListener('mouseover',function(e){var m=e.target.closest('.title-main');var pops=document.querySelectorAll('.sub-popup');if(!m){pops.forEach(function(p){p.style.display='none'});return}var popup=m.querySelector('.sub-popup');if(!popup)return;var subs=m.getAttribute('data-subs');if(!subs){popup.style.display='none';return}if(popup.dataset.loaded!=='1'){var html='';subs.split('||').forEach(function(s){var sep=s.indexOf('|');if(sep<0)return;var t=s.substring(0,sep),u=s.substring(sep+1);html+="<a class='sub-item' href='"+u+"' target='_blank'>"+t+"</a>"});popup.innerHTML=html;popup.dataset.loaded='1'}popup.style.display='block';var r=m.getBoundingClientRect();popup.style.left=Math.min(r.left,window.innerWidth-popup.offsetWidth-10)+'px';popup.style.top=(r.bottom+4)+'px'})
 </script>
 </body>
 </html>
