@@ -60,15 +60,13 @@ function Get-BatchQuotes {
                     $eqIdx = $line.IndexOf("=")
                     $val = $line.Substring($eqIdx + 1).Trim('"')
                     $parts = $val -split '~'
-                    if ($parts.Count -ge 32) {
-                        $code = $parts[2]; $cur = [double]($parts[3]); $pc = [double]($parts[4])
-                        $change = if ($pc -ne 0) { [Math]::Round(($cur - $pc) / $pc * 100, 2) } else { 0 }
-                        # Compute OHLC for today's candle from quote data
-                        $tOpen = [Math]::Round($pc, 2)
-                        $tHigh = [Math]::Round([Math]::Max($pc, $cur) * 1.01, 2)
-                        $tLow = [Math]::Round([Math]::Min($pc, $cur) * 0.99, 2)
+                    if ($parts.Count -ge 32) { try {
+                        $code = $parts[2]; $cur = $parts[3] -as [double]; $pc = $parts[4] -as [double]
+                        if ($cur -eq $null) { $cur = 0 }; if ($pc -eq $null -or $pc -eq 0) { $pc = $cur }
+                        $change = [Math]::Round(($cur - $pc) / $pc * 100, 2)
+                        $tOpen = [Math]::Round($pc, 2); $tHigh = [Math]::Round([Math]::Max($pc, $cur) * 1.01, 2); $tLow = [Math]::Round([Math]::Min($pc, $cur) * 0.99, 2)
                         $result[$code] = @{Name=$parts[1]; Price=$cur; Change=$change; TodayO=$tOpen; TodayH=$tHigh; TodayL=$tLow}
-                    }
+                    } catch { } }
                 }
             }
         } catch {
@@ -79,7 +77,7 @@ function Get-BatchQuotes {
     return $result
 }
 
-$allPrefixed = $allPrefixed[0..[Math]::Min(4999, $allPrefixed.Count-1)]
+# Query all stocks (don't limit to 5000, so stocks with announcements get quotes)
 $stockQuotes = Get-BatchQuotes -PrefixedCodes $allPrefixed
 Write-Output "Quotes: $($stockQuotes.Count) stocks"
 
