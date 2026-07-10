@@ -206,10 +206,13 @@ foreach ($annItem in $allAnn) {
     }
     $kl = Get-Kline -Code $code; $tl = if ($kl) { Get-TREND -K $kl } else { @() }
     $fc = Get-FCAST -T $title -D $Date -U "http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"
+    # Pre-compute K-line data string for mini chart
+    $kdStr = ""
+    if ($kl -and $kl.Count -ge 60) { $bars = @(); for ($bi = 0; $bi -lt $kl.Count; $bi += 4) { $bars += "$($kl[$bi]),$($kl[$bi+1]),$($kl[$bi+2]),$($kl[$bi+3])" }; $kdStr = $bars -join "|" }
     if ($tl -and $tl.Count -gt 0) {
         $null = $processed.Add([PSCustomObject]@{
             Score=$score; Code=$code; Name=$name; Title=$title; Cat=$cp; Time=$dtStr; Board=$board
-            Mcap=if($qi){0}else{0}; CP=$cpNow; S=$sl; CS=$cs; CL=$cl; TL=$tl
+            Mcap=if($qi){0}else{0}; CP=$cpNow; S=$sl; CS=$cs; CL=$cl; TL=$tl; KD=$kdStr
             Url="http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"
             FH=$fc.H; FD=$fc.D; FT=$fc.Tip; FC=$fc.C; FU=$fc.U
         })
@@ -259,7 +262,7 @@ foreach ($item in $sorted) {
     if(-not$trendHtml){$trendHtml="<span class='trend-na'>-</span>"}
     $fcHtml = if($item.FH){"<a href='$($item.Url)' target='_blank' title='$($item.FT)' class='forecast-link $($item.FC)'>$($item.FD)</a>"}else{"-"}
     $emPrefix = if($item.Code-match'^(60|688)'){'sh'}else{'sz'}
-    $emUrl = "http://qt.gtimg.cn/q=$emPrefix$($item.Code)"
+    $emUrl = "https://quote.eastmoney.com/$emPrefix$($item.Code).html"
     # Build sub-items data (pipe-separated "title|url" entries, double-pipe between items)
     $subData = ""; $hasSubs = $false; $subCount = 0
     if ($item.Subs -and $item.Subs.Count -gt 0) {
@@ -273,12 +276,14 @@ foreach ($item in $sorted) {
         $subData = $subParts -join "||"
     }
     $titleCell = if($hasSubs) {
-        "<span class='title-main' data-subs='$subData'><a href='$($item.Url)' target='_blank' title='$se'>$($item.Title)</a><span class='sub-badge'>+$subCount</span></span><div class='sub-popup' style='display:none'></div>"
+        "<span class='title-main' data-subs='$subData'><a href='$($item.Url)' target='_blank' title='$se'>$($item.Title)</a><span class='sub-badge'>+$subCount</span><div class='sub-popup' style='display:none'></div></span>"
     } else {
         "<a href='$($item.Url)' target='_blank' title='$se'>$($item.Title)</a>"
     }
+    # Use pre-computed K-line data from processing step
+    $klineData = if ($item.KD) { $item.KD } else { "" }
     $itemsHtml += @"
-    <tr class="$cc" data-change="$chv" data-corr="$($item.CS)" data-trend="$trendScore"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank">$($item.Code)</a></td><td class="name">$($item.Name)</td><td class="board">$($boardMap[$item.Board])</td><td class="title-col">$titleCell</td><td class="cat"><span class="cat-tag $cc">$($catLabel[[int]$item.Cat])</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fcHtml</td><td class="time">$($item.Time)</td></tr>
+    <tr class="$cc" data-change="$chv" data-corr="$($item.CS)" data-trend="$trendScore"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank">$($item.Code)</a></td><td class="name" data-kline="$klineData">$($item.Name)</td><td class="board">$($boardMap[$item.Board])</td><td class="title-col">$titleCell</td><td class="cat"><span class="cat-tag $cc">$($catLabel[[int]$item.Cat])</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fcHtml</td><td class="time">$($item.Time)</td></tr>
 "@
     $i++
 }
@@ -360,10 +365,15 @@ tr.high .score{color:#e74c3c}tr.medium .score{color:#e67e22}
 </table></div>
 <div class="footer">数据来源:CNINFO(巨潮资讯网) 行情:qt.gtimg.cn K线:TDX本地.day | TDX安装:$TDXDir</div>
 </div>
+<div id="klineTip" style="display:none;position:fixed;z-index:9998;background:#fff;border:1px solid #d9d9d9;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:8px 12px;pointer-events:none;min-width:220px"><div style="font-size:11px;color:#999;margin-bottom:3px;text-align:center">最近K线</div><svg id="ksvg" width="200" height="55"></svg><div style="display:flex;justify-content:space-between;font-size:10px;color:#999;margin-top:3px"><span id="khigh">-</span><span id="klow">-</span></div></div>
 <script>
 function filterTable(){var q=document.getElementById('searchBox').value.toLowerCase(),rows=document.querySelectorAll('#tableBody tr');rows.forEach(function(r){var m=false;for(var i=1;i<=4;i++){if(r.cells[i]?.textContent.toLowerCase().includes(q)){m=true;break}}r.style.display=m||!q?'':'none'})}
 function sortTable(c){var t=document.getElementById('tableBody'),r=Array.from(t.querySelectorAll('tr'));var d=t.getAttribute('d')==='a'?'d':'a';t.setAttribute('d',d);r.sort(function(a,b){var v1=a.cells[c]?.textContent||'',v2=b.cells[c]?.textContent||'';var n1=parseFloat(v1),n2=parseFloat(v2);if(!isNaN(n1)&&!isNaN(n2)){return d==='a'?n1-n2:n2-n1}return d==='a'?v1.localeCompare(v2,'zh-CN'):v2.localeCompare(v1,'zh-CN')});r.forEach(function(x,i){x.cells[0].textContent=i+1;t.appendChild(x)})}
 document.addEventListener('mouseover',function(e){var m=e.target.closest('.title-main');var pops=document.querySelectorAll('.sub-popup');if(!m){pops.forEach(function(p){p.style.display='none'});return}var popup=m.querySelector('.sub-popup');if(!popup)return;var subs=m.getAttribute('data-subs');if(!subs){popup.style.display='none';return}if(popup.dataset.loaded!=='1'){var html='';subs.split('||').forEach(function(s){var sep=s.indexOf('|');if(sep<0)return;var t=s.substring(0,sep),u=s.substring(sep+1);html+="<a class='sub-item' href='"+u+"' target='_blank'>"+t+"</a>"});popup.innerHTML=html;popup.dataset.loaded='1'}popup.style.display='block';var r=m.getBoundingClientRect();popup.style.left=Math.min(r.left,window.innerWidth-popup.offsetWidth-10)+'px';popup.style.top=(r.bottom+4)+'px'})
+// K-line mini chart on name hover
+var kt=document.getElementById('klineTip'),ks=document.getElementById('ksvg'),kh=document.getElementById('khigh'),kl=document.getElementById('klow');
+document.getElementById('tableBody').addEventListener('mouseover',function(e){var td=e.target.closest('td.name');if(!td){kt.style.display='none';return}var tr=td.closest('tr'),kd=tr.getAttribute('data-kline');if(!kd||kd.length<10){kt.style.display='none';return}var bars=kd.split('|').map(function(s){var p=s.split(',');return{o:+p[0],h:+p[1],l:+p[2],c:+p[3]}});var allP=[];for(var i=0;i<bars.length;i++){allP.push(bars[i].h,bars[i].l)}var min=Math.min.apply(null,allP),max=Math.max.apply(null,allP),range=max-min||1;var w=200,h=55,pt=3,pb=3,pl=2,bw=(w-pl-2)/bars.length,hw=Math.max(1,bw*0.6);var sy=function(v){return pt+(1-(v-min)/range)*(h-pt-pb)};var bodyW=Math.max(1,Math.min(hw-2,bw*0.75));var html='';for(i=0;i<bars.length;i++){var b=bars[i],cx=pl+i*bw+bw/2;var yh=sy(b.h),yl=sy(b.l),yo=sy(b.o),yc=sy(b.c);html+='<line x1="'+cx+'" y1="'+yh+'" x2="'+cx+'" y2="'+yl+'" stroke="#333" stroke-width="0.8"/>';var topY=Math.min(yo,yc),botY=Math.max(yo,yc);if(b.c>=b.o){html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="#fff" stroke="#333" stroke-width="0.6"/>'}else{html+='<rect x="'+(cx-bodyW/2)+'" y="'+topY+'" width="'+bodyW+'" height="'+(botY-topY||1)+'" fill="#000"/>'}}ks.setAttribute('viewBox','0 0 '+w+' '+h);ks.innerHTML=html;kh.textContent='H:'+max.toFixed(2);kl.textContent='L:'+min.toFixed(2)+' C:'+bars[bars.length-1].c.toFixed(2);kt.style.display='block';var r=td.getBoundingClientRect();kt.style.left=Math.min(r.left,window.innerWidth-kt.offsetWidth-10)+'px';kt.style.top=(r.bottom+4)+'px'});
+document.getElementById('tableBody').addEventListener('mouseout',function(e){if(!e.target.closest('td.name')){kt.style.display='none'}});
 </script>
 </body>
 </html>
