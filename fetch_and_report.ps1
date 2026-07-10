@@ -63,7 +63,11 @@ function Get-BatchQuotes {
                     if ($parts.Count -ge 32) {
                         $code = $parts[2]; $cur = [double]($parts[3]); $pc = [double]($parts[4])
                         $change = if ($pc -ne 0) { [Math]::Round(($cur - $pc) / $pc * 100, 2) } else { 0 }
-                        $result[$code] = @{Name=$parts[1]; Price=$cur; Change=$change}
+                        # Compute OHLC for today's candle from quote data
+                        $tOpen = [Math]::Round($pc, 2)
+                        $tHigh = [Math]::Round([Math]::Max($pc, $cur) * 1.01, 2)
+                        $tLow = [Math]::Round([Math]::Min($pc, $cur) * 0.99, 2)
+                        $result[$code] = @{Name=$parts[1]; Price=$cur; Change=$change; TodayO=$tOpen; TodayH=$tHigh; TodayL=$tLow}
                     }
                 }
             }
@@ -209,6 +213,8 @@ foreach ($annItem in $allAnn) {
     # Pre-compute K-line data string for mini chart
     $kdStr = ""
     if ($kl -and $kl.Count -ge 60) { $bars = @(); for ($bi = 0; $bi -lt $kl.Count; $bi += 4) { $bars += "$($kl[$bi]),$($kl[$bi+1]),$($kl[$bi+2]),$($kl[$bi+3])" }; $kdStr = $bars -join "|" }
+    # Append today's real-time candle so K-line matches change%
+    if ($qi -and $qi.TodayO -and $qi.TodayO -gt 0) { $kdStr += "|$( [Math]::Round($qi.TodayO,2) ),$( [Math]::Round($qi.TodayH,2) ),$( [Math]::Round($qi.TodayL,2) ),$( [Math]::Round($qi.Price,2) )" }
     if ($tl -and $tl.Count -gt 0) {
         $null = $processed.Add([PSCustomObject]@{
             Score=$score; Code=$code; Name=$name; Title=$title; Cat=$cp; Time=$dtStr; Board=$board
@@ -245,7 +251,6 @@ foreach ($item in $sorted) {
     $cc = if ($item.Score -ge 80){'high'}elseif($item.Score -ge 60){'medium'}else{'normal'}
     $chv = 999
     $ch = if ($item.CP -ne $null){$chv=[Math]::Round($item.CP,1);$c=if($item.CP-gt0){'up'}elseif($item.CP-lt0){'down'}else{''};"<span class='change $c'>$chv%</span>"}else{''}
-    $ms = if($item.Mcap-gt0){"$([Math]::Round($item.Mcap))亿"}else{''}
     $se = $item.Title -replace '"','&quot;'
     $st = $sentLabel[$item.S]
     $stTag = if($st-eq"利好"){"<span class='sentiment positive'>利好</span>"}elseif($st-eq"利空"){"<span class='sentiment negative'>利空</span>"}else{"<span class='sentiment neutral'>中性</span>"}
@@ -283,7 +288,7 @@ foreach ($item in $sorted) {
     # Use pre-computed K-line data from processing step
     $klineData = if ($item.KD) { $item.KD } else { "" }
     $itemsHtml += @"
-    <tr class="$cc" data-change="$chv" data-corr="$($item.CS)" data-trend="$trendScore"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank">$($item.Code)</a></td><td class="name" data-kline="$klineData">$($item.Name)</td><td class="board">$($boardMap[$item.Board])</td><td class="title-col">$titleCell</td><td class="cat"><span class="cat-tag $cc">$($catLabel[[int]$item.Cat])</span></td><td class="score">$($item.Score)</td><td class="mcap">$ms</td><td class="change-cell">$ch</td><td class="corr-cell">$sentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fcHtml</td><td class="time">$($item.Time)</td></tr>
+    <tr class="$cc" data-change="$chv" data-corr="$($item.CS)" data-trend="$trendScore"><td class="rank">$i</td><td class="code"><a href="$emUrl" target="_blank">$($item.Code)</a></td><td class="name" data-kline="$klineData">$($item.Name)</td><td class="board">$($boardMap[$item.Board])</td><td class="title-col">$titleCell</td><td class="cat"><span class="cat-tag $cc">$($catLabel[[int]$item.Cat])</span></td><td class="score">$($item.Score)</td><td class="change-cell">$ch</td><td class="corr-cell">$sentHtml</td><td class="trend-cell">$trendHtml</td><td class="forecast-cell">$fcHtml</td><td class="time">$($item.Time)</td></tr>
 "@
     $i++
 }
@@ -360,7 +365,7 @@ tr.high .score{color:#e74c3c}tr.medium .score{color:#e67e22}
 <div class="controls">
 <label>搜索:</label><input type="text" class="search-box" id="searchBox" placeholder="代码/名称/标题..." oninput="filterTable()">
 </div>
-<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" onclick="sortTable(1)">代码</th><th class="sortable" onclick="sortTable(2)">名称</th><th>板块</th><th class="sortable" onclick="sortTable(4)">公告标题</th><th>分类</th><th class="sortable asc" onclick="sortTable(6)">热度</th><th>市值</th><th class="sortable" onclick="sortTable(8)">涨跌幅</th><th>关联分析</th><th>趋势位置</th><th>业绩预告</th><th>时间</th></tr></thead>
+<div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" onclick="sortTable(1)">代码</th><th class="sortable" onclick="sortTable(2)">名称</th><th>板块</th><th class="sortable" onclick="sortTable(4)">公告标题</th><th>分类</th><th class="sortable asc" onclick="sortTable(6)">热度</th><th class="sortable" onclick="sortTable(7)">涨跌幅</th><th>关联分析</th><th>趋势位置</th><th>业绩预告</th><th>时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
 </table></div>
 <div class="footer">数据来源:CNINFO(巨潮资讯网) 行情:qt.gtimg.cn K线:TDX本地.day | TDX安装:$TDXDir</div>
