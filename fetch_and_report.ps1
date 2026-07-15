@@ -362,6 +362,7 @@ tr.high .score{color:#e74c3c}tr.medium .score{color:#e67e22}
 <div class="container">
 <div class="controls">
 <label>搜索:</label><input type="text" class="search-box" id="searchBox" placeholder="代码/名称/标题..." oninput="filterTable()">
+<button class="btn-sort" onclick="exportTxt()">📋 导出股票代码</button>
 </div>
 <div class="table-wrapper"><table><thead><tr><th style="width:40px">#</th><th class="sortable" onclick="sortTable(1)">代码</th><th class="sortable" onclick="sortTable(2)">名称</th><th>板块</th><th class="sortable" onclick="sortTable(4)">公告标题</th><th>分类</th><th class="sortable asc" onclick="sortTable(6)">热度</th><th class="sortable" onclick="sortTable(7)">涨跌幅</th><th>关联分析</th><th>趋势位置</th><th>业绩预告</th><th>时间</th></tr></thead>
 <tbody id="tableBody">$itemsHtml</tbody>
@@ -372,6 +373,8 @@ tr.high .score{color:#e74c3c}tr.medium .score{color:#e67e22}
 <script>
 function filterTable(){var q=document.getElementById('searchBox').value.toLowerCase(),rows=document.querySelectorAll('#tableBody tr');rows.forEach(function(r){var m=false;for(var i=1;i<=4;i++){if(r.cells[i]?.textContent.toLowerCase().includes(q)){m=true;break}}r.style.display=m||!q?'':'none'})}
 function sortTable(c){var t=document.getElementById('tableBody'),r=Array.from(t.querySelectorAll('tr'));var d=t.getAttribute('d')==='a'?'d':'a';t.setAttribute('d',d);r.sort(function(a,b){var v1=a.cells[c]?.textContent||'',v2=b.cells[c]?.textContent||'';var n1=parseFloat(v1),n2=parseFloat(v2);if(!isNaN(n1)&&!isNaN(n2)){return d==='a'?n1-n2:n2-n1}return d==='a'?v1.localeCompare(v2,'zh-CN'):v2.localeCompare(v1,'zh-CN')});r.forEach(function(x,i){x.cells[0].textContent=i+1;t.appendChild(x)})}
+// Export visible stock codes to txt file
+function exportTxt(){var d=new Date(),ymd=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(),hh=('0'+d.getHours()).slice(-2),fn=ymd+hh+'.txt';var rows=document.querySelectorAll('#tableBody tr');if(!rows.length)return alert('无数据可导出');var codes=[];rows.forEach(function(r){if(r.style.display!=='none'){var c=r.cells[1]?.textContent;if(c)codes.push(c)}});if(!codes.length)return alert('无数据可导出');var blob=new Blob([codes.join('\r\n')],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href)}
 // Single handler for all tooltips
 var kt=document.getElementById('klineTip'),ks=document.getElementById('ksvg'),kh=document.getElementById('khigh'),kl=document.getElementById('klow');
 document.addEventListener('mouseover',function(e){
