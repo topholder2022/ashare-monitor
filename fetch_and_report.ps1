@@ -155,13 +155,18 @@ function Get-Kline {
     if (-not (Test-Path $f)) { return $null }
     try {
         $fs = [System.IO.File]::OpenRead($f); $reader = New-Object System.IO.BinaryReader($fs)
-        $total = $fs.Length / 32; $s = [Math]::Max(0, $total - 20)
+        $total = $fs.Length / 32; $s = [Math]::Max(0, $total - 250)
         $reader.BaseStream.Seek($s * 32, [System.IO.SeekOrigin]::Begin) | Out-Null
         $result = @()
         for ($i = $s; $i -lt $total; $i++) {
-            $reader.ReadUInt32() | Out-Null
-            $result += [Math]::Round($reader.ReadUInt32()/100,2), [Math]::Round($reader.ReadUInt32()/100,2), [Math]::Round($reader.ReadUInt32()/100,2), [Math]::Round($reader.ReadUInt32()/100,2)
-            $reader.ReadUInt32() | Out-Null; $reader.ReadUInt32() | Out-Null; $reader.ReadUInt32() | Out-Null
+            $reader.ReadUInt32() | Out-Null  # date
+            $result += [Math]::Round($reader.ReadUInt32()/100,2)  # open
+            $result += [Math]::Round($reader.ReadUInt32()/100,2)  # high
+            $result += [Math]::Round($reader.ReadUInt32()/100,2)  # low
+            $result += [Math]::Round($reader.ReadUInt32()/100,2)  # close
+            $reader.ReadUInt32() | Out-Null  # amount
+            $result += $reader.ReadUInt32()   # volume
+            $reader.ReadUInt32() | Out-Null  # reserved
         }
         $reader.Close(); $fs.Close(); return $result
     } catch { return $null }
@@ -169,10 +174,15 @@ function Get-Kline {
 function Get-TREND {
     param([array]$K)
     $labels = @()
-    if (-not $K -or $K.Count -lt 60) { return $labels }
-    $n = $K.Count / 4; $h = @(); $l = @(); $c = @(); $o = @()
-    for ($i = 0; $i -lt $n; $i++) { $o += $K[$i*4]; $h += $K[$i*4+1]; $l += $K[$i*4+2]; $c += $K[$i*4+3] }
-    if ($c[-1] -gt $o[-1]) { $labels += "sudden" }
+    if (-not $K -or $K.Count -lt 100) { return $labels }
+    $n = $K.Count / 5; $h = @(); $l = @(); $c = @(); $o = @(); $v = @()
+    for ($i = 0; $i -lt $n; $i++) { $o += $K[$i*5]; $h += $K[$i*5+1]; $l += $K[$i*5+2]; $c += $K[$i*5+3]; $v += $K[$i*5+4] }
+    # 突发量变: hhv(ref(v,1),10)=hhv(v,230) and c>ref(h,1)
+    $i10 = [Math]::Max(0, $n-11); $i11 = [Math]::Max(0, $n-1)
+    $i230 = [Math]::Max(0, $n-231); $i231 = [Math]::Max(0, $n-1)
+    $d10Vol = ($v[$i10..($i11-1)] | Measure-Object -Maximum).Maximum
+    $d230Vol = ($v[$i230..($i231-1)] | Measure-Object -Maximum).Maximum
+    if ($d10Vol -eq $d230Vol -and $d230Vol -gt 0 -and $c[-1] -gt $h[-2]) { $labels += "sudden" }
     $i15 = [Math]::Max(0, $n-15); $i75 = [Math]::Max(0, $n-75)
     $d75H = ($h[$i75..($n-1)] | Measure-Object -Maximum).Maximum
     $d15H = ($h[$i15..($n-1)] | Measure-Object -Maximum).Maximum
@@ -210,7 +220,7 @@ foreach ($annItem in $allAnn) {
     $fc = Get-FCAST -T $title -D $Date -U "http://www.cninfo.com.cn/new/disclosure/detail?announcementId=$aid"
     # Pre-compute K-line data string for mini chart
     $kdStr = ""
-    if ($kl -and $kl.Count -ge 60) { $bars = @(); for ($bi = 0; $bi -lt $kl.Count; $bi += 4) { $bars += "$($kl[$bi]),$($kl[$bi+1]),$($kl[$bi+2]),$($kl[$bi+3])" }; $kdStr = $bars -join "|" }
+    if ($kl -and $kl.Count -ge 100) { $bars = @(); $startC = [Math]::Max(0, $kl.Count - 100); for ($bi = $startC; $bi -lt $kl.Count; $bi += 5) { $bars += "$($kl[$bi]),$($kl[$bi+1]),$($kl[$bi+2]),$($kl[$bi+3])" }; $kdStr = $bars -join "|" }
     # Append today's real-time candle so K-line matches change%
     if ($qi -and $qi.TodayO -and $qi.TodayO -gt 0) { $kdStr += "|$( [Math]::Round($qi.TodayO,2) ),$( [Math]::Round($qi.TodayH,2) ),$( [Math]::Round($qi.TodayL,2) ),$( [Math]::Round($qi.Price,2) )" }
     if ($tl -and $tl.Count -gt 0) {
